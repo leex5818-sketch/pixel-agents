@@ -147,8 +147,11 @@ function App() {
     editor.handleToggleEditMode,
   )
 
-  const handleCloseAgent = useCallback((id: number) => {
-    vscode.postMessage({ type: 'closeAgent', id })
+  const handleCloseAgent = useCallback((_id: number) => {
+    // X 버튼은 선택 해제만 — 에이전트 제거 아님
+    const os = getOfficeState()
+    os.selectedAgentId = null
+    os.cameraFollowId = null
   }, [])
 
   const handleClick = useCallback((agentId: number) => {

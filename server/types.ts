@@ -56,5 +56,6 @@ export type ServerMessage =
 export type ClientMessage =
   | { type: "ready" }
   | { type: "webviewReady" }
+  | { type: "closeAgent"; id: number }
   | { type: "saveLayout"; layout: unknown }
   | { type: "saveAgentSeats"; seats: Record<number, { palette: number; hueShift: number; seatId: string | null }> };

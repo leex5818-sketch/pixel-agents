@@ -23,6 +23,7 @@ const IDLE_SHUTDOWN_MS = 600_000; // 10 minutes
 
 // State
 const agents = new Map<string, TrackedAgent>(); // sessionId -> agent
+const closedSessionIds = new Set<string>(); // manually closed — won't reappear until restart
 let nextAgentId = 1;
 const clients = new Set<WebSocket>();
 let lastActivityTime = Date.now();
@@ -335,6 +336,18 @@ wss.on("connection", (ws) => {
         } catch (err) {
           console.error(`[Server] Failed to save layout: ${err instanceof Error ? err.message : err}`);
         }
+      } else if (msg.type === "closeAgent") {
+        const targetId = msg.id as number;
+        // Find and remove the agent by numeric id
+        for (const [sessionId, agent] of agents) {
+          if (agent.id === targetId) {
+            closedSessionIds.add(sessionId);
+            agents.delete(sessionId);
+            broadcast({ type: "agentClosed", id: targetId });
+            console.log(`Agent ${targetId} closed by user`);
+            break;
+          }
+        }
       } else if (msg.type === "saveAgentSeats") {
         try {
           mkdirSync(persistDir, { recursive: true });
@@ -356,6 +369,7 @@ const watcher = new JsonlWatcher();
 
 watcher.on("fileAdded", (file: WatchedFile) => {
   if (agents.has(file.sessionId)) return;
+  if (closedSessionIds.has(file.sessionId)) return; // user manually closed
   lastActivityTime = Date.now();
 
   const sessionTopic = extractSessionTopic(file.path);

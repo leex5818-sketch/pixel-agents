@@ -562,10 +562,9 @@ export class OfficeState {
         // Schedule walk to break room after idle delay
         this.scheduleBreakRoom(id)
       } else {
-        // Cancel pending break room walk
+        // Cancel pending break room walk and walk back to desk
         this.cancelBreakRoom(id)
-        // Walk back to desk
-        this.sendToSeat(id)
+        if (ch.seatId) this.sendToSeat(id)
       }
       this.rebuildFurnitureInstances()
     }

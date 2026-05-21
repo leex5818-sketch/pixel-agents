@@ -5,7 +5,7 @@ import { homedir } from "os";
 import { EventEmitter } from "events";
 
 const CLAUDE_PROJECTS_DIR = join(homedir(), ".claude", "projects");
-const ACTIVE_THRESHOLD_MS = 600_000; // 10 minutes — Claude can think for 5+ min without writing
+const ACTIVE_THRESHOLD_MS = 3_600_000; // 1 hour — sessions can be idle during reading/thinking
 const POLL_INTERVAL_MS = 1000;
 
 export interface WatchedFile {

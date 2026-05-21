@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { OfficeState } from './office/engine/officeState.js'
 import { OfficeCanvas } from './office/components/OfficeCanvas.js'
 import { ToolOverlay } from './office/components/ToolOverlay.js'
@@ -14,6 +14,7 @@ import { useEditorKeyboard } from './hooks/useEditorKeyboard.js'
 import { ZoomControls } from './components/ZoomControls.js'
 import { BottomToolbar } from './components/BottomToolbar.js'
 import { DebugView } from './components/DebugView.js'
+import { RoomLabels } from './components/RoomLabels.js'
 
 // Game state lives outside React — updated imperatively by message handlers
 const officeStateRef = { current: null as OfficeState | null }
@@ -121,7 +122,7 @@ function App() {
 
   const isEditDirty = useCallback(() => editor.isEditMode && editor.isDirty, [editor.isEditMode, editor.isDirty])
 
-  const { agents, selectedAgent, agentTools, agentStatuses, subagentTools, subagentCharacters, layoutReady, loadedAssets, workspaceFolders } = useExtensionMessages(getOfficeState, editor.setLastSavedLayout, isEditDirty)
+  const { agents, selectedAgent, agentTools, agentStatuses, agentSessionTopics, subagentTools, subagentCharacters, layoutReady, loadedAssets, workspaceFolders } = useExtensionMessages(getOfficeState, editor.setLastSavedLayout, isEditDirty)
 
   const [isDebugMode, setIsDebugMode] = useState(false)
 
@@ -175,6 +176,21 @@ function App() {
     return false
   })()
 
+  // On first layout load, shift map down so the top (Conference Room) is visible
+  useEffect(() => {
+    if (!layoutReady) return
+    const dpr = window.devicePixelRatio || 1
+    const canvasH = Math.round(window.innerHeight * dpr)
+    const layout = officeState.getLayout()
+    const mapH = layout.rows * 16 * editor.zoom  // TILE_SIZE = 16
+    if (mapH > canvasH) {
+      // Show map from top with 8px margin
+      const margin = Math.round(8 * dpr)
+      editor.panRef.current.y = Math.ceil((mapH - canvasH) / 2) + margin
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layoutReady])
+
   if (!layoutReady) {
     return (
       <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--vscode-foreground)' }}>
@@ -211,6 +227,15 @@ function App() {
       />
 
       <ZoomControls zoom={editor.zoom} onZoomChange={editor.handleZoomChange} />
+
+      {/* Room name labels */}
+      <RoomLabels
+        zoom={editor.zoom}
+        panRef={editor.panRef}
+        containerRef={containerRef}
+        cols={officeState.getLayout().cols}
+        rows={officeState.getLayout().rows}
+      />
 
       {/* Vignette overlay */}
       <div
@@ -289,6 +314,7 @@ function App() {
         officeState={officeState}
         agents={agents}
         agentTools={agentTools}
+        agentSessionTopics={agentSessionTopics}
         subagentCharacters={subagentCharacters}
         containerRef={containerRef}
         zoom={editor.zoom}

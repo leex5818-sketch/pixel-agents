@@ -2,7 +2,8 @@ import * as path from "path";
 import type { TrackedAgent, ServerMessage } from "./types.js";
 
 const READING_TOOLS = new Set(["Read", "Grep", "Glob", "WebFetch", "WebSearch"]);
-const PERMISSION_EXEMPT_TOOLS = new Set(["Task", "AskUserQuestion"]);
+const AGENT_TOOLS = new Set(["Task", "Agent"]);   // Task = 구버전, Agent = 현재 Claude Code SDK
+const PERMISSION_EXEMPT_TOOLS = new Set(["Task", "Agent", "AskUserQuestion"]);
 const PERMISSION_TIMER_DELAY_MS = 7000;
 const TEXT_IDLE_DELAY_MS = 5000;
 const TOOL_DONE_DELAY_MS = 300;
@@ -197,7 +198,7 @@ function handleAssistantMessage(
           hasNonExemptTool = true;
         }
 
-        emit({ type: "agentToolStart", id: agent.id, toolId, status });
+        emit({ type: "agentToolStart", id: agent.id, toolId, status, toolName, toolInput: input });
       }
     }
     if (hasNonExemptTool) {
@@ -230,7 +231,7 @@ function handleUserMessage(
           const completedToolId = block.tool_use_id as string;
 
           // If completed tool was a Task, clear its subagent tools
-          if (agent.activeToolNames.get(completedToolId) === "Task") {
+          if (AGENT_TOOLS.has(agent.activeToolNames.get(completedToolId) ?? "")) {
             agent.activeSubagentToolIds.delete(completedToolId);
             agent.activeSubagentToolNames.delete(completedToolId);
             emit({
@@ -318,7 +319,7 @@ function handleProgressMessage(
   }
 
   // Only handle subagent progress for Task tools
-  if (agent.activeToolNames.get(parentToolId) !== "Task") return;
+  if (!AGENT_TOOLS.has(agent.activeToolNames.get(parentToolId) ?? "")) return;
 
   const msg = data.message as Record<string, unknown> | undefined;
   if (!msg) return;

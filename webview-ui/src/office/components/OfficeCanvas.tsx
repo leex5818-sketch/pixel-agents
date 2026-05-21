@@ -630,32 +630,37 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
   }, [isEditMode, officeState, screenToTile])
 
   // Wheel: Ctrl+wheel to zoom, plain wheel/trackpad to pan
-  const handleWheel = useCallback(
-    (e: React.WheelEvent) => {
-      e.preventDefault()
-      if (e.ctrlKey || e.metaKey) {
-        // Accumulate scroll delta, step zoom when threshold crossed
-        zoomAccumulatorRef.current += e.deltaY
-        if (Math.abs(zoomAccumulatorRef.current) >= ZOOM_SCROLL_THRESHOLD) {
-          const delta = zoomAccumulatorRef.current < 0 ? 1 : -1
-          zoomAccumulatorRef.current = 0
-          const newZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoom + delta))
-          if (newZoom !== zoom) {
-            onZoomChange(newZoom)
-          }
+  // Must be attached imperatively with { passive: false } so preventDefault() works
+  const wheelHandlerRef = useRef<((e: WheelEvent) => void) | null>(null)
+  wheelHandlerRef.current = (e: WheelEvent) => {
+    e.preventDefault()
+    if (e.ctrlKey || e.metaKey) {
+      zoomAccumulatorRef.current += e.deltaY
+      if (Math.abs(zoomAccumulatorRef.current) >= ZOOM_SCROLL_THRESHOLD) {
+        const delta = zoomAccumulatorRef.current < 0 ? 1 : -1
+        zoomAccumulatorRef.current = 0
+        const newZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoom + delta))
+        if (newZoom !== zoom) {
+          onZoomChange(newZoom)
         }
-      } else {
-        // Pan via trackpad two-finger scroll or mouse wheel
-        const dpr = window.devicePixelRatio || 1
-        officeState.cameraFollowId = null
-        panRef.current = clampPan(
-          panRef.current.x - e.deltaX * dpr,
-          panRef.current.y - e.deltaY * dpr,
-        )
       }
-    },
-    [zoom, onZoomChange, officeState, panRef, clampPan],
-  )
+    } else {
+      const dpr = window.devicePixelRatio || 1
+      officeState.cameraFollowId = null
+      panRef.current = clampPan(
+        panRef.current.x - e.deltaX * dpr,
+        panRef.current.y - e.deltaY * dpr,
+      )
+    }
+  }
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const handler = (e: WheelEvent) => { wheelHandlerRef.current?.(e) }
+    canvas.addEventListener('wheel', handler, { passive: false })
+    return () => canvas.removeEventListener('wheel', handler)
+  }, []) // mount/unmount only — handler reads latest values via ref
 
   // Prevent default middle-click browser behavior (auto-scroll)
   const handleAuxClick = useCallback((e: React.MouseEvent) => {
@@ -681,7 +686,6 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
         onClick={handleClick}
         onAuxClick={handleAuxClick}
         onMouseLeave={handleMouseLeave}
-        onWheel={handleWheel}
         onContextMenu={handleContextMenu}
         style={{ display: 'block' }}
       />

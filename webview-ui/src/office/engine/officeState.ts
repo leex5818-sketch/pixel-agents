@@ -26,6 +26,22 @@ import {
 } from '../layout/layoutSerializer.js'
 import { getCatalogEntry, getOnStateType } from '../layout/furnitureCatalog.js'
 
+// Regular agents prefer private offices and main area; subagents prefer conference room
+const REGULAR_AGENT_SEAT_PRIORITY = [
+  'off1-chair-a', 'off1-chair-b',
+  'off2-chair',
+  'off3-chair-a', 'off3-chair-b',
+  'off4-chair',
+  'main-chair-1', 'main-chair-2', 'main-chair-3', 'main-chair-4',
+  'conf-chair-1', 'conf-chair-2', 'conf-chair-3',
+  'conf-chair-4', 'conf-chair-5', 'conf-chair-6',
+]
+
+const SUBAGENT_SEAT_PRIORITY = [
+  'conf-chair-1', 'conf-chair-2', 'conf-chair-3',
+  'conf-chair-4', 'conf-chair-5', 'conf-chair-6',
+]
+
 export class OfficeState {
   layout: OfficeLayout
   tileMap: TileTypeVal[][]
@@ -166,6 +182,15 @@ export class OfficeState {
     return null
   }
 
+  /** Find a free seat by priority list; falls back to any free seat */
+  private findSeatByPriority(priorityList: string[]): string | null {
+    for (const uid of priorityList) {
+      const seat = this.seats.get(uid)
+      if (seat && !seat.assigned) return uid
+    }
+    return this.findFreeSeat()
+  }
+
   /**
    * Pick a diverse palette for a new agent based on currently active agents.
    * First 6 agents each get a unique skin (random order). Beyond 6, skins
@@ -216,7 +241,7 @@ export class OfficeState {
       }
     }
     if (!seatId) {
-      seatId = this.findFreeSeat()
+      seatId = this.findSeatByPriority(REGULAR_AGENT_SEAT_PRIORITY)
     }
 
     let ch: Character
@@ -367,20 +392,32 @@ export class OfficeState {
     const palette = parentCh ? parentCh.palette : 0
     const hueShift = parentCh ? parentCh.hueShift : 0
 
-    // Find the free seat closest to the parent agent
+    // Find the free seat: prefer conference room, then closest to parent
     const parentCol = parentCh ? parentCh.tileCol : 0
     const parentRow = parentCh ? parentCh.tileRow : 0
     const dist = (c: number, r: number) =>
       Math.abs(c - parentCol) + Math.abs(r - parentRow)
 
+    // Try conference room seats first
     let bestSeatId: string | null = null
-    let bestDist = Infinity
-    for (const [uid, seat] of this.seats) {
-      if (!seat.assigned) {
-        const d = dist(seat.seatCol, seat.seatRow)
-        if (d < bestDist) {
-          bestDist = d
-          bestSeatId = uid
+    for (const uid of SUBAGENT_SEAT_PRIORITY) {
+      const seat = this.seats.get(uid)
+      if (seat && !seat.assigned) {
+        bestSeatId = uid
+        break
+      }
+    }
+
+    // Fall back to closest available seat
+    if (!bestSeatId) {
+      let bestDist = Infinity
+      for (const [uid, seat] of this.seats) {
+        if (!seat.assigned) {
+          const d = dist(seat.seatCol, seat.seatRow)
+          if (d < bestDist) {
+            bestDist = d
+            bestSeatId = uid
+          }
         }
       }
     }

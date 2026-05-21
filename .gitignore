@@ -17,3 +17,8 @@ sd-office/
 pixel-agents-current.png
 *.HEIC
 *.MOV
+
+# Local config and cache
+.env
+.env.local
+*.plist

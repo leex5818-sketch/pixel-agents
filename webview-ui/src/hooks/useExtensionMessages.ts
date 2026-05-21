@@ -45,6 +45,7 @@ export interface ExtensionMessageState {
   selectedAgent: number | null
   agentTools: Record<number, ToolActivity[]>
   agentStatuses: Record<number, string>
+  agentSessionTopics: Record<number, string>
   subagentTools: Record<number, Record<string, ToolActivity[]>>
   subagentCharacters: SubagentCharacter[]
   layoutReady: boolean
@@ -72,6 +73,7 @@ export function useExtensionMessages(
   const [agentStatuses, setAgentStatuses] = useState<Record<number, string>>({})
   const [subagentTools, setSubagentTools] = useState<Record<number, Record<string, ToolActivity[]>>>({})
   const [subagentCharacters, setSubagentCharacters] = useState<SubagentCharacter[]>([])
+  const [agentSessionTopics, setAgentSessionTopics] = useState<Record<number, string>>({})
   const [layoutReady, setLayoutReady] = useState(false)
   const [loadedAssets, setLoadedAssets] = useState<{ catalog: FurnitureAsset[]; sprites: Record<string, string[][]> } | undefined>()
   const [workspaceFolders, setWorkspaceFolders] = useState<WorkspaceFolder[]>([])
@@ -115,10 +117,18 @@ export function useExtensionMessages(
       } else if (msg.type === 'agentCreated') {
         const id = msg.id as number
         const folderName = msg.folderName as string | undefined
+        const sessionTopic = msg.sessionTopic as string | undefined
         setAgents((prev) => (prev.includes(id) ? prev : [...prev, id]))
         setSelectedAgent(id)
+        if (sessionTopic) {
+          setAgentSessionTopics((prev) => ({ ...prev, [id]: sessionTopic }))
+        }
         os.addAgent(id, undefined, undefined, undefined, undefined, folderName)
         saveAgentSeats(os)
+      } else if (msg.type === 'agentTopicLoaded') {
+        const id = msg.id as number
+        const sessionTopic = msg.sessionTopic as string
+        setAgentSessionTopics((prev) => ({ ...prev, [id]: sessionTopic }))
       } else if (msg.type === 'agentClosed') {
         const id = msg.id as number
         setAgents((prev) => prev.filter((a) => a !== id))
@@ -168,13 +178,14 @@ export function useExtensionMessages(
         const id = msg.id as number
         const toolId = msg.toolId as string
         const status = msg.status as string
+        const toolName: string | undefined = (msg.toolName as string | undefined) || extractToolName(status) || undefined
+        const toolInput = (msg.toolInput as Record<string, unknown> | undefined) || undefined
         setAgentTools((prev) => {
           const list = prev[id] || []
           if (list.some((t) => t.toolId === toolId)) return prev
-          return { ...prev, [id]: [...list, { toolId, status, done: false }] }
+          return { ...prev, [id]: [...list, { toolId, toolName, toolInput, status, done: false }] }
         })
-        const toolName = extractToolName(status)
-        os.setAgentTool(id, toolName)
+        os.setAgentTool(id, toolName ?? null)
         os.setAgentActive(id, true)
         os.clearPermissionBubble(id)
         // Create sub-agent character for Task tool subtasks
@@ -360,5 +371,5 @@ export function useExtensionMessages(
     return () => window.removeEventListener('message', handler)
   }, [getOfficeState])
 
-  return { agents, selectedAgent, agentTools, agentStatuses, subagentTools, subagentCharacters, layoutReady, loadedAssets, workspaceFolders }
+  return { agents, selectedAgent, agentTools, agentStatuses, agentSessionTopics, subagentTools, subagentCharacters, layoutReady, loadedAssets, workspaceFolders }
 }

@@ -76,6 +76,8 @@ export interface FurnitureInstance {
 
 export interface ToolActivity {
   toolId: string
+  toolName?: string
+  toolInput?: Record<string, unknown>
   status: string
   done: boolean
   permissionWait?: boolean

@@ -31,10 +31,11 @@ export interface TrackedAgent {
 // Messages sent from server to client via WebSocket
 // Must match the upstream message format expected by useExtensionMessages
 export type ServerMessage =
-  | { type: "agentCreated"; id: number; folderName: string }
+  | { type: "agentCreated"; id: number; folderName: string; sessionTopic?: string }
+  | { type: "agentTopicLoaded"; id: number; sessionTopic: string }
   | { type: "agentClosed"; id: number }
   | { type: "existingAgents"; agents: number[]; folderNames: Record<number, string>; agentMeta?: Record<number, { palette?: number; hueShift?: number; seatId?: string }> }
-  | { type: "agentToolStart"; id: number; toolId: string; status: string }
+  | { type: "agentToolStart"; id: number; toolId: string; status: string; toolName?: string; toolInput?: Record<string, unknown> }
   | { type: "agentToolDone"; id: number; toolId: string }
   | { type: "agentToolsClear"; id: number }
   | { type: "agentStatus"; id: number; status: string }

@@ -9,6 +9,7 @@ interface ToolOverlayProps {
   officeState: OfficeState
   agents: number[]
   agentTools: Record<number, ToolActivity[]>
+  agentSessionTopics: Record<number, string>
   subagentCharacters: SubagentCharacter[]
   containerRef: React.RefObject<HTMLDivElement | null>
   zoom: number
@@ -16,34 +17,52 @@ interface ToolOverlayProps {
   onCloseAgent: (id: number) => void
 }
 
+const TOOL_ICONS: Record<string, string> = {
+  Read: '📖',
+  Write: '✏️',
+  Edit: '✏️',
+  Bash: '💻',
+  WebSearch: '🌐',
+  WebFetch: '🌐',
+  Grep: '🔍',
+  Glob: '🔍',
+  Task: '👥',
+  Agent: '👥',
+  AskUserQuestion: '❓',
+  EnterPlanMode: '📋',
+  NotebookEdit: '📓',
+}
+
 /** Derive a short human-readable activity string from tools/status */
-function getActivityText(
+function getActiveTool(
   agentId: number,
   agentTools: Record<number, ToolActivity[]>,
   isActive: boolean,
-): string {
+): ToolActivity | null {
   const tools = agentTools[agentId]
   if (tools && tools.length > 0) {
-    // Find the latest non-done tool
     const activeTool = [...tools].reverse().find((t) => !t.done)
-    if (activeTool) {
-      if (activeTool.permissionWait) return 'Needs approval'
-      return activeTool.status
-    }
-    // All tools done but agent still active (mid-turn) — keep showing last tool status
-    if (isActive) {
-      const lastTool = tools[tools.length - 1]
-      if (lastTool) return lastTool.status
-    }
+    if (activeTool) return activeTool
+    if (isActive) return tools[tools.length - 1] || null
   }
+  return null
+}
 
-  return 'Idle'
+function getToolDetail(tool: ToolActivity): string {
+  const input = tool.toolInput || {}
+  if (typeof input.file_path === 'string' && input.file_path) return input.file_path
+  if (typeof input.command === 'string' && input.command) return input.command
+  if (typeof input.description === 'string' && input.description) return input.description
+  if (typeof input.query === 'string' && input.query) return input.query
+  if (typeof input.url === 'string' && input.url) return input.url
+  return ''
 }
 
 export function ToolOverlay({
   officeState,
   agents,
   agentTools,
+  agentSessionTopics,
   subagentCharacters,
   containerRef,
   zoom,
@@ -98,7 +117,14 @@ export function ToolOverlay({
         // Always show name label; show activity details on hover/select
         const displayName = ch.folderName || (isSub ? 'Subtask' : `Agent #${id}`)
 
-        // Get activity text (only needed when showing details)
+        // Parent agent name for subagents
+        const parentCh = isSub && ch.parentAgentId != null
+          ? officeState.characters.get(ch.parentAgentId)
+          : null
+        const parentName = parentCh?.folderName || (ch.parentAgentId != null ? `Agent #${ch.parentAgentId}` : null)
+
+        // Get activity info (only needed when showing details)
+        let activeTool: ToolActivity | null = null
         let activityText = ''
         let dotColor: string | null = null
         if (showDetails) {
@@ -111,7 +137,12 @@ export function ToolOverlay({
               activityText = sub ? sub.label : 'Subtask'
             }
           } else {
-            activityText = getActivityText(id, agentTools, ch.isActive)
+            activeTool = getActiveTool(id, agentTools, ch.isActive)
+            if (activeTool) {
+              activityText = activeTool.permissionWait ? 'Needs approval' : activeTool.status
+            } else {
+              activityText = 'Idle'
+            }
           }
 
           const tools = agentTools[id]
@@ -145,17 +176,16 @@ export function ToolOverlay({
               <div
                 style={{
                   display: 'flex',
-                  alignItems: 'center',
+                  alignItems: 'flex-start',
                   gap: 5,
                   background: 'var(--pixel-bg)',
                   border: isSelected
                     ? '2px solid var(--pixel-border-light)'
                     : '2px solid var(--pixel-border)',
                   borderRadius: 0,
-                  padding: isSelected ? '3px 6px 3px 8px' : '3px 8px',
+                  padding: isSelected ? '5px 6px 5px 8px' : '5px 8px',
                   boxShadow: 'var(--pixel-shadow)',
-                  whiteSpace: 'nowrap',
-                  maxWidth: 220,
+                  maxWidth: 300,
                 }}
               >
                 {dotColor && (
@@ -167,33 +197,101 @@ export function ToolOverlay({
                       borderRadius: '50%',
                       background: dotColor,
                       flexShrink: 0,
+                      marginTop: 4,
                     }}
                   />
                 )}
-                <div style={{ overflow: 'hidden' }}>
-                  <span
-                    style={{
-                      fontSize: isSub ? '20px' : '22px',
-                      fontStyle: isSub ? 'italic' : undefined,
-                      color: 'var(--vscode-foreground)',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      display: 'block',
-                    }}
-                  >
-                    {activityText}
-                  </span>
+                <div style={{ overflow: 'hidden', minWidth: 0 }}>
+                  {/* Agent name + subagent parent */}
                   <span
                     style={{
                       fontSize: '16px',
                       color: 'var(--pixel-text-dim)',
+                      display: 'block',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
-                      display: 'block',
+                      whiteSpace: 'nowrap',
                     }}
                   >
                     {displayName}
+                    {isSub && parentName && (
+                      <span style={{ opacity: 0.7 }}> ↳ {parentName}</span>
+                    )}
                   </span>
+
+                  {/* Tool name + icon */}
+                  {activeTool?.toolName ? (
+                    <>
+                      <span
+                        style={{
+                          fontSize: '20px',
+                          color: 'var(--vscode-foreground)',
+                          display: 'block',
+                          marginTop: 2,
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {TOOL_ICONS[activeTool.toolName] || '⚡'} {activeTool.toolName}
+                        {activeTool.permissionWait && (
+                          <span style={{ color: 'var(--pixel-status-permission)', marginLeft: 4 }}>— 승인 대기</span>
+                        )}
+                      </span>
+                      {/* Full detail (path / command / query) */}
+                      {(() => {
+                        const detail = getToolDetail(activeTool)
+                        return detail ? (
+                          <span
+                            style={{
+                              fontSize: '16px',
+                              color: 'var(--pixel-text-dim)',
+                              display: 'block',
+                              marginTop: 2,
+                              wordBreak: 'break-all',
+                              opacity: 0.85,
+                            }}
+                          >
+                            {detail}
+                          </span>
+                        ) : null
+                      })()}
+                    </>
+                  ) : (
+                    <>
+                      <span
+                        style={{
+                          fontSize: isSub ? '20px' : '22px',
+                          fontStyle: isSub ? 'italic' : undefined,
+                          color: 'var(--vscode-foreground)',
+                          display: 'block',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          marginTop: 2,
+                        }}
+                      >
+                        {activityText}
+                      </span>
+                      {/* Session topic for idle regular agents */}
+                      {!isSub && activityText === 'Idle' && agentSessionTopics[id] && (
+                        <span
+                          style={{
+                            fontSize: '15px',
+                            color: 'var(--pixel-text-dim)',
+                            display: 'block',
+                            marginTop: 3,
+                            maxWidth: 260,
+                            wordBreak: 'break-word',
+                            opacity: 0.75,
+                            fontStyle: 'italic',
+                            borderTop: '1px solid var(--pixel-border)',
+                            paddingTop: 3,
+                          }}
+                        >
+                          💬 {agentSessionTopics[id]}
+                        </span>
+                      )}
+                    </>
+                  )}
                 </div>
                 {isSelected && !isSub && (
                   <button

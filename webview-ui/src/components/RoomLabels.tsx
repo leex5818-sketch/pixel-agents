@@ -24,7 +24,7 @@ const ROOM_LABELS: RoomLabel[] = [
   { name: 'Office 4',   tileCol: 1.3, tileRow: 23.3 },
   { name: 'Main',       tileCol: 7.3, tileRow: 9.3 },
   { name: 'Entry',      tileCol: 15.2, tileRow: 10.3 },
-  { name: 'Break',      tileCol: 14.5, tileRow: 20.3 },
+  { name: '휴게실',     tileCol: 14.5, tileRow: 20.3 },
 ]
 
 export function RoomLabels({ zoom, panRef, containerRef }: RoomLabelsProps) {
@@ -72,15 +72,23 @@ export function RoomLabels({ zoom, panRef, containerRef }: RoomLabelsProps) {
           >
             <span
               style={{
-                fontSize: `${Math.max(8, Math.round(9 * zoom))}px`,
-                color: 'rgba(255, 255, 255, 0.5)',
+                fontSize: `${Math.max(9, Math.round(10 * zoom))}px`,
+                fontWeight: 'bold',
+                color: 'rgba(255, 255, 255, 0.92)',
                 fontFamily: 'inherit',
-                letterSpacing: '0.08em',
-                textTransform: 'uppercase',
+                letterSpacing: '0.12em',
+                textTransform: /[a-zA-Z]/.test(label.name) ? 'uppercase' : 'none',
                 whiteSpace: 'nowrap',
                 userSelect: 'none',
                 display: 'block',
-                textShadow: '1px 1px 0px rgba(0,0,0,0.8), -1px -1px 0px rgba(0,0,0,0.8)',
+                textShadow: [
+                  '0 0 6px rgba(0,0,0,1)',
+                  '1px 1px 0 rgba(0,0,0,1)',
+                  '-1px -1px 0 rgba(0,0,0,1)',
+                  '1px -1px 0 rgba(0,0,0,1)',
+                  '-1px 1px 0 rgba(0,0,0,1)',
+                  '2px 2px 4px rgba(0,0,0,0.9)',
+                ].join(', '),
               }}
             >
               {label.name}

@@ -37,6 +37,21 @@ const REGULAR_AGENT_SEAT_PRIORITY = [
   'conf-chair-4', 'conf-chair-5', 'conf-chair-6',
 ]
 
+// Idle delay before walking to break room (ms)
+const BREAK_ROOM_IDLE_DELAY_MS = 20_000
+
+// Candidate tiles in the break room (tried in order until one is walkable)
+const BREAK_ROOM_TILES = [
+  { col: 16, row: 22 },
+  { col: 15, row: 22 },
+  { col: 17, row: 22 },
+  { col: 16, row: 21 },
+  { col: 15, row: 21 },
+  { col: 17, row: 21 },
+  { col: 16, row: 23 },
+  { col: 15, row: 23 },
+]
+
 const SUBAGENT_SEAT_PRIORITY = [
   'conf-chair-1', 'conf-chair-2', 'conf-chair-3',
   'conf-chair-4', 'conf-chair-5', 'conf-chair-6',
@@ -59,6 +74,8 @@ export class OfficeState {
   /** Reverse lookup: sub-agent character ID → parent info */
   subagentMeta: Map<number, { parentAgentId: number; parentToolId: string }> = new Map()
   private nextSubagentId = -1
+  /** Idle timers: agentId → setTimeout handle */
+  private idleTimers: Map<number, ReturnType<typeof setTimeout>> = new Map()
 
   constructor(layout?: OfficeLayout) {
     this.layout = layout || createDefaultLayout()
@@ -273,6 +290,7 @@ export class OfficeState {
   }
 
   removeAgent(id: number): void {
+    this.cancelBreakRoom(id)
     const ch = this.characters.get(id)
     if (!ch) return
     if (ch.matrixEffect === 'despawn') return // already despawning
@@ -541,8 +559,52 @@ export class OfficeState {
         ch.seatTimer = -1
         ch.path = []
         ch.moveProgress = 0
+        // Schedule walk to break room after idle delay
+        this.scheduleBreakRoom(id)
+      } else {
+        // Cancel pending break room walk
+        this.cancelBreakRoom(id)
+        // Walk back to desk
+        this.sendToSeat(id)
       }
       this.rebuildFurnitureInstances()
+    }
+  }
+
+  private scheduleBreakRoom(id: number): void {
+    this.cancelBreakRoom(id)
+    const timer = setTimeout(() => {
+      this.idleTimers.delete(id)
+      this.walkToBreakRoom(id)
+    }, BREAK_ROOM_IDLE_DELAY_MS)
+    this.idleTimers.set(id, timer)
+  }
+
+  private cancelBreakRoom(id: number): void {
+    const timer = this.idleTimers.get(id)
+    if (timer !== undefined) {
+      clearTimeout(timer)
+      this.idleTimers.delete(id)
+    }
+  }
+
+  private walkToBreakRoom(id: number): void {
+    const ch = this.characters.get(id)
+    if (!ch || ch.isSubagent || ch.isActive) return
+    for (const { col, row } of BREAK_ROOM_TILES) {
+      if (isWalkable(col, row, this.tileMap, this.blockedTiles)) {
+        const path = this.withOwnSeatUnblocked(ch, () =>
+          findPath(ch.tileCol, ch.tileRow, col, row, this.tileMap, this.blockedTiles)
+        )
+        if (path.length > 0) {
+          ch.path = path
+          ch.moveProgress = 0
+          ch.state = CharacterState.WALK
+          ch.frame = 0
+          ch.frameTimer = 0
+          return
+        }
+      }
     }
   }
 

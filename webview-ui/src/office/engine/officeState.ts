@@ -38,7 +38,7 @@ const REGULAR_AGENT_SEAT_PRIORITY = [
 ]
 
 // Idle delay before walking to break room (ms)
-const BREAK_ROOM_IDLE_DELAY_MS = 20_000
+const BREAK_ROOM_IDLE_DELAY_MS = 3_000
 
 // Candidate tiles in the break room (tried in order until one is walkable)
 const BREAK_ROOM_TILES = [

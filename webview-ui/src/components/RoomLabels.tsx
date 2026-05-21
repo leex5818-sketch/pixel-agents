@@ -24,7 +24,7 @@ const ROOM_LABELS: RoomLabel[] = [
   { name: 'Office 4',   tileCol: 1.3, tileRow: 23.3 },
   { name: 'Main',       tileCol: 7.3, tileRow: 9.3 },
   { name: 'Entry',      tileCol: 15.2, tileRow: 10.3 },
-  { name: '휴게실',     tileCol: 14.5, tileRow: 20.3 },
+  { name: 'Break',      tileCol: 14.5, tileRow: 20.3 },
 ]
 
 export function RoomLabels({ zoom, panRef, containerRef }: RoomLabelsProps) {
@@ -77,7 +77,7 @@ export function RoomLabels({ zoom, panRef, containerRef }: RoomLabelsProps) {
                 color: 'rgba(255, 255, 255, 0.92)',
                 fontFamily: 'inherit',
                 letterSpacing: '0.12em',
-                textTransform: /[a-zA-Z]/.test(label.name) ? 'uppercase' : 'none',
+                textTransform: 'uppercase',
                 whiteSpace: 'nowrap',
                 userSelect: 'none',
                 display: 'block',

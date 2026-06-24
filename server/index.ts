@@ -434,7 +434,7 @@ watcher.on("line", (file: WatchedFile, line: string) => {
 
 // Start
 watcher.start();
-server.listen(PORT, () => {
+server.listen(PORT, "127.0.0.1", () => {
   console.log(`Pixel Agents server running at http://localhost:${PORT}`);
   console.log(`Watching ~/.claude/projects/ for active sessions...`);
 });
